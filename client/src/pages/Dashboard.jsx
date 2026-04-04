@@ -6,7 +6,7 @@ import { Heart, MessageCircle, HandMetal, Plus, Zap, Trophy, Settings, LogOut, U
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, fetchProfile } = useAuth()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -14,8 +14,9 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchProjects()
-  }, [])
+  fetchProjects()
+  if (user) fetchProfile(user.id)
+}, [])
 
   const fetchProjects = async () => {
     const { data, error } = await supabase
@@ -70,15 +71,20 @@ export default function Dashboard() {
 
         {/* Profile */}
         <div className="p-4 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
-              {initials(profile?.full_name || user?.email)}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">{profile?.full_name || 'Builder'}</p>
-              <p className="text-xs text-gray-500">@{profile?.username || 'user'}</p>
-            </div>
+          <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
+            onClick={() => navigate(`/profile/${user?.id}`)}>
+            {profile?.avatar_url ? (
+              <img src={`${profile.avatar_url}?t=${Date.now()}`} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+            ) : (
+          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
+          {initials(profile?.full_name || user?.email)}
           </div>
+        )}
+        <div>
+           <p className="text-sm font-medium text-white">{profile?.full_name || 'Builder'}</p>
+           <p className="text-xs text-gray-500">@{profile?.username || 'user'}</p>
+        </div>
+        </div>
         </div>
 
         {/* Nav */}
@@ -106,7 +112,7 @@ export default function Dashboard() {
 
       {/* Main content */}
       <div className="ml-64 flex-1 flex">
-        <div className="flex-1 max-w-2xl mx-auto px-6 py-8">
+        <div className="flex-1 px-6 py-8">
 
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
