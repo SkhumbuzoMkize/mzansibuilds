@@ -43,52 +43,23 @@ A real-time developer feed platform where developers can:
 
 ## System Architecture
 
-┌─────────────────────────────────────────────────────┐
-│ CLIENT LAYER │
-│ React + Vite + Tailwind CSS │
-│ ┌──────────┐ ┌──────────┐ ┌──────────────────────┐ │
-│ │ Landing │ │Dashboard │ │ Project Detail │ │
-│ │ Login │ │ Feed │ │ Celebration Wall │ │
-│ │ Register│ │ Profile │ │ Milestones/Comments │ │
-│ └──────────┘ └──────────┘ └──────────────────────┘ │
-└─────────────────────┬───────────────────────────────┘
-│ HTTPS / Supabase Client
-┌─────────────────────▼───────────────────────────────┐
-│ SUPABASE LAYER │
-│ ┌──────────────┐ ┌───────────┐ ┌──────────────┐ │
-│ │ Auth │ │ Database │ │ Storage │ │
-│ │ JWT Tokens │ │ PostgreSQL│ │ Avatars │ │
-│ │ RLS Policies│ │ RLS │ │ Images │ │
-│ └──────────────┘ └───────────┘ └──────────────┘ │
-└─────────────────────────────────────────────────────┘
+<div align="center">
+
+| System Architecture                                    |
+| ------------------------------------------------------ |
+| ![System Architecture](images/system-architecture.png) |
+
+</div>
 
 ## Database Schema (UML)
 
-┌─────────────────┐ ┌─────────────────────┐
-│ profiles │ │ projects │
-├─────────────────┤ ├─────────────────────┤
-│ id (PK) │──────<│ id (PK) │
-│ username │ │ user_id (FK) │
-│ full_name │ │ title │
-│ avatar_url │ │ description │
-│ bio │ │ stage |
-│ created_at │ │ tech_stack[] │
-└─────────────────┘ │ need_help │
-│ progress │
-│ created_at │
-└──────────┬──────────┘
-│
-┌──────────────────────┼──────────────────┐
-| │ │
-┌──────────▼──────┐ ┌───────────▼──────┐ ┌────────▼────────┐
-│ milestones │ │ comments │ │ collaborations │
-├─────────────────┤ ├──────────────────┤ ├─────────────────┤
-│ id (PK) │ │ id (PK) │ │ id (PK) │
-│ project_id (FK) │ │ project_id (FK) │ │ project_id (FK) │
-│ title │ │ user_id (FK) │ │ user_id (FK) │
-│ status │ │ content │ │ message │
-│ created_at │ │ created_at │ │ created_at │
-└─────────────────┘ └──────────────────┘ └─────────────────┘
+<div align="center">
+
+| Database Schema                                |
+| ---------------------------------------------- |
+| ![Database Schema](images/database-schema.png) |
+
+</div>
 
 ## Tech Stack Justification
 
