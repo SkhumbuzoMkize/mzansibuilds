@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines how Artificial Intelligence (AI) tools were used
+This document outlines how Artificial Intelligence tools were used
 ethically and consciously during the development of MzansiBuilds.
 
 ## AI Tools Used
