@@ -72,32 +72,33 @@ npm test -- --run
 
 ## Project Structure
 
-mzansibuilds/
-├── .github/
-│ └── workflows/
-│ └── ci.yml # GitHub Actions CI/CD pipeline
-├── client/ # React frontend
-│ ├── src/
-│ │ ├── components/ # Reusable UI components
-│ │ ├── context/ # React context (Auth)
-│ │ ├── lib/ # Supabase client
-│ │ ├── pages/ # Page components
-│ │ │ ├── Landing.jsx
-│ │ │ ├── Login.jsx
-│ │ │ ├── Register.jsx
-│ │ │ ├── Dashboard.jsx
-│ │ │ ├── ProjectDetail.jsx
-│ │ │ ├── CelebrationWall.jsx
-│ │ │ └── Profile.jsx
-│ │ └── test/ # Unit tests
-│ │ ├── setup.js
-│ │ └── auth.test.jsx
-│ └── vite.config.js
-├── server/ # Node.js backend
-├── docs/ # Documentation
-│ ├── PROJECT_PROFILE.md # UML and architecture
-│ └── SECURITY.md # Security documentation
-└── README.md
+<div align="center">
+
+| Project Structure                                       |
+| ------------------------------------------------------- |
+| ![Project Structure](docs/images/project-structure.png) |
+
+</div>
+
+## Architecture
+
+<div align="center">
+
+| System Architecture                                         |
+| ----------------------------------------------------------- |
+| ![System Architecture](docs/images/system-architecture.png) |
+
+</div>
+
+## Database Schema
+
+<div align="center">
+
+| Database Schema                                     |
+| --------------------------------------------------- |
+| ![Database Schema](docs/images/database-schema.png) |
+
+</div>
 
 ## Features
 
