@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ArrowLeft, Edit2, Save, X, Camera } from 'lucide-react'
+import { ArrowLeft, Edit2, Save, X, Camera, Home } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Profile() {
@@ -107,7 +107,7 @@ export default function Profile() {
 
         {/* Back */}
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
-          <ArrowLeft size={16} /> Back to Feed
+        <Home size={16} /> Home
         </button>
 
         {/* Profile card */}

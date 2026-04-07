@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { Heart, MessageCircle, HandMetal, Plus, Zap, Trophy, Settings, LogOut, User } from 'lucide-react'
+import { MessageCircle, Plus, Zap, Trophy, LogOut, User, Search, Bookmark, Bell } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
@@ -10,21 +10,62 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('All')
+  const [followingIds, setFollowingIds] = useState([])
+  const [savedIds, setSavedIds] = useState([])
+  const [counts, setCounts] = useState({})
   const navigate = useNavigate()
 
   useEffect(() => {
-  fetchProjects()
-  if (user) fetchProfile(user.id)
-}, [])
+    fetchProjects()
+    if (user) fetchProfile(user.id)
+  }, [])
 
   const fetchProjects = async () => {
-    const { data, error } = await supabase
-      .from('projects')
-      .select(`*, profiles(full_name, username, avatar_url)`)
-      .order('created_at', { ascending: false })
-    if (!error) setProjects(data)
+    const [{ data: projectsData }, { data: followData }, { data: savedData }] = await Promise.all([
+      supabase.from('projects').select(`*, profiles(full_name, username, avatar_url)`).order('created_at', { ascending: false }),
+      supabase.from('follows').select('following_id').eq('follower_id', user?.id),
+      supabase.from('saved_projects').select('project_id').eq('user_id', user?.id),
+    ])
+    if (projectsData) {
+      setProjects(projectsData)
+      fetchCounts(projectsData)
+    }
+    if (followData) setFollowingIds(followData.map(f => f.following_id))
+    if (savedData) setSavedIds(savedData.map(s => s.project_id))
     setLoading(false)
+  }
+
+  const fetchCounts = async (projectsList) => {
+    const ids = projectsList.map(p => p.id)
+    const [{ data: likesData }, { data: commentsData }, { data: collabsData }] = await Promise.all([
+      supabase.from('likes').select('project_id').in('project_id', ids),
+      supabase.from('comments').select('project_id').in('project_id', ids),
+      supabase.from('collaborations').select('project_id').in('project_id', ids),
+    ])
+    const newCounts = {}
+    ids.forEach(id => {
+      newCounts[id] = {
+        likes: likesData?.filter(l => l.project_id === id).length || 0,
+        comments: commentsData?.filter(c => c.project_id === id).length || 0,
+        collabs: collabsData?.filter(c => c.project_id === id).length || 0,
+      }
+    })
+    setCounts(newCounts)
+  }
+
+  const handleSaveFromFeed = async (e, projectId) => {
+    e.stopPropagation()
+    if (savedIds.includes(projectId)) {
+      await supabase.from('saved_projects').delete().eq('project_id', projectId).eq('user_id', user.id)
+      setSavedIds(savedIds.filter(id => id !== projectId))
+      toast.success('Removed from saved')
+    } else {
+      await supabase.from('saved_projects').insert({ project_id: projectId, user_id: user.id })
+      setSavedIds([...savedIds, projectId])
+      toast.success('Project saved!')
+    }
   }
 
   const handleSignOut = async () => {
@@ -33,10 +74,15 @@ export default function Dashboard() {
   }
 
   const filteredProjects = projects.filter(p => {
-    if (activeFilter === 'All') return true
-    if (activeFilter === 'Following') return p.user_id === user?.id
-    if (activeFilter === 'Collab') return p.need_help === true
-    return true
+    const matchesFilter = activeFilter === 'All' ? true :
+      activeFilter === 'Following' ? followingIds.includes(p.user_id) :
+      activeFilter === 'Collab' ? p.need_help === true :
+      activeFilter === 'Saved' ? savedIds.includes(p.id) : true
+    const matchesSearch = searchQuery === '' ? true :
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.tech_stack?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+    return matchesFilter && matchesSearch
   })
 
   const stageColor = (stage) => {
@@ -65,7 +111,9 @@ export default function Dashboard() {
       <div className="w-64 bg-gray-950 border-r border-gray-800 flex flex-col fixed h-full">
         <div className="p-6 border-b border-gray-800">
           <h1 className="text-xl font-bold">
-            <span className="text-green-500">&lt;/&gt;</span> MzansiBuilds
+            <span className="text-green-500">&lt;/&gt;</span>{' '}
+            <span className="text-white">Mzansi</span>
+            <span className="text-green-500">Builds</span>
           </h1>
         </div>
 
@@ -76,15 +124,15 @@ export default function Dashboard() {
             {profile?.avatar_url ? (
               <img src={`${profile.avatar_url}?t=${Date.now()}`} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
             ) : (
-          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
-          {initials(profile?.full_name || user?.email)}
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
+                {initials(profile?.full_name || user?.email)}
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium text-white">{profile?.full_name || 'Builder'}</p>
+              <p className="text-xs text-gray-500">@{profile?.username || 'user'}</p>
+            </div>
           </div>
-        )}
-        <div>
-           <p className="text-sm font-medium text-white">{profile?.full_name || 'Builder'}</p>
-           <p className="text-xs text-gray-500">@{profile?.username || 'user'}</p>
-        </div>
-        </div>
         </div>
 
         {/* Nav */}
@@ -111,125 +159,168 @@ export default function Dashboard() {
       </div>
 
       {/* Main content */}
-      <div className="ml-64 flex-1 flex">
-        <div className="flex-1 px-6 py-8">
+      <div className="ml-64 flex-1 flex flex-col">
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <Zap size={20} className="text-green-500" /> Developer Feed
-              </h2>
-              <p className="text-gray-500 text-sm mt-1">See what developers are building</p>
+        {/* Sticky search header */}
+        <div className="sticky top-0 z-10 bg-black border-b border-gray-800 px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search projects, developers, skills..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500 transition"
+              />
             </div>
+            {/* Notification bell */}
+            <NotificationBell userId={user?.id} onClick={() => navigate('/notifications')} />
             <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-lg text-sm transition">
               <Plus size={16} /> New Project
             </button>
           </div>
+        </div>
 
-          {/* Filters */}
-          <div className="flex gap-2 mb-6">
-            {['All', 'Following', 'Collab'].map(f => (
-              <button key={f} onClick={() => setActiveFilter(f)}
-                className={`px-4 py-1.5 rounded-full text-sm border transition ${activeFilter === f ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                {f === 'Collab' ? 'Seeking Collab' : f}
-              </button>
-            ))}
+        {/* Main feed */}
+        <div className="flex-1 flex">
+          <div className="flex-1 px-6 py-8">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Zap size={20} className="text-green-500" /> Developer Feed
+                </h2>
+                <p className="text-gray-500 text-sm mt-1">See what developers are building</p>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {['All', 'Following', 'Collab', 'Saved'].map(f => (
+                <button key={f} onClick={() => setActiveFilter(f)}
+                  className={`px-4 py-1.5 rounded-full text-sm border transition ${activeFilter === f ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                  {f === 'Collab' ? 'Seeking Collab' : f === 'Saved' ? <span className="flex items-center gap-1"><Bookmark size={12} /> Saved</span> : f}
+                </button>
+              ))}
+            </div>
+
+            {/* Feed */}
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="text-center py-20 text-gray-500">
+                <p className="text-lg mb-2">No projects yet</p>
+                <p className="text-sm">
+                  {activeFilter === 'Following' ? 'Follow some developers to see their projects here!' :
+                   activeFilter === 'Saved' ? 'Save some projects to see them here!' :
+                   "Be the first to share what you're building!"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredProjects.map(project => (
+                  <div key={project.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-700 transition cursor-pointer"
+                    onClick={() => navigate(`/project/${project.id}`)}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">
+                          {initials(project.profiles?.full_name || 'U')}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{project.profiles?.full_name}</p>
+                          <p className="text-xs text-gray-500">@{project.profiles?.username} · {timeAgo(project.created_at)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Bookmark icon */}
+                        <button
+                          onClick={e => handleSaveFromFeed(e, project.id)}
+                          className={`p-1.5 rounded-lg transition ${savedIds.includes(project.id) ? 'text-yellow-400' : 'text-gray-600 hover:text-gray-400'}`}>
+                          <Bookmark size={16} fill={savedIds.includes(project.id) ? 'currentColor' : 'none'} />
+                        </button>
+                        <span className={`text-xs px-2 py-1 rounded-full border ${stageColor(project.stage)}`}>
+                          {project.stage}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h3 className="font-semibold text-white mb-1">{project.title}</h3>
+                    <p className="text-gray-400 text-sm mb-3 line-clamp-2">{project.description}</p>
+
+                    {project.tech_stack?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {project.tech_stack.map(tech => (
+                          <span key={tech} className="text-xs text-gray-400 border border-gray-700 rounded px-2 py-0.5">#{tech}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Progress bar */}
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Progress</span><span>{project.progress}%</span>
+                      </div>
+                      <div className="h-1 bg-gray-800 rounded-full">
+                        <div className="h-1 bg-green-500 rounded-full transition-all" style={{ width: `${project.progress}%` }} />
+                      </div>
+                    </div>
+
+                    {project.need_help && (
+                      <div className="flex items-center gap-2 mb-3 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
+                        ✋ Needs collaborators
+                        {project.help_description && <span className="text-gray-400">— {project.help_description}</span>}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+                      <div className="flex items-center gap-4 text-gray-500 text-sm">
+                        <button className="flex items-center gap-1 hover:text-red-400 transition" onClick={e => { e.stopPropagation(); navigate(`/project/${project.id}`) }}>
+                          ❤️ <span>{counts[project.id]?.likes || 0}</span>
+                        </button>
+                        <button className="flex items-center gap-1 hover:text-blue-400 transition" onClick={e => { e.stopPropagation(); navigate(`/project/${project.id}`) }}>
+                          <MessageCircle size={14} /> <span>{counts[project.id]?.comments || 0}</span>
+                        </button>
+                        <button className="flex items-center gap-1 hover:text-green-400 transition" onClick={e => { e.stopPropagation(); navigate(`/project/${project.id}`) }}>
+                          ✋ <span>{counts[project.id]?.collabs || 0}</span>
+                        </button>
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); navigate(`/project/${project.id}`) }}
+                        className="text-xs border border-gray-700 hover:border-green-500 hover:text-green-400 text-gray-400 px-3 py-1.5 rounded-lg transition">
+                        View Project
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Feed */}
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              <p className="text-lg mb-2">No projects yet</p>
-              <p className="text-sm">Be the first to share what you're building!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredProjects.map(project => (
-                <div key={project.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-700 transition cursor-pointer"
-                  onClick={() => navigate(`/project/${project.id}`)}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">
-                        {initials(project.profiles?.full_name || 'U')}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{project.profiles?.full_name}</p>
-                        <p className="text-xs text-gray-500">@{project.profiles?.username} · {timeAgo(project.created_at)}</p>
-                      </div>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full border ${stageColor(project.stage)}`}>
-                      {project.stage}
-                    </span>
-                  </div>
-
-                  <h3 className="font-semibold text-white mb-1">{project.title}</h3>
-                  <p className="text-gray-400 text-sm mb-3 line-clamp-2">{project.description}</p>
-
-                  {project.tech_stack?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {project.tech_stack.map(tech => (
-                        <span key={tech} className="text-xs text-gray-400 border border-gray-700 rounded px-2 py-0.5">#{tech}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Progress bar */}
-                  <div className="mb-3">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Progress</span><span>{project.progress}%</span>
-                    </div>
-                    <div className="h-1 bg-gray-800 rounded-full">
-                      <div className="h-1 bg-green-500 rounded-full transition-all" style={{ width: `${project.progress}%` }} />
-                    </div>
-                  </div>
-
-                  {project.need_help && (
-                    <div className="flex items-center gap-2 mb-3 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
-                      <HandMetal size={12} /> Needs collaborators
-                      {project.help_description && <span className="text-gray-400">— {project.help_description}</span>}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-4 pt-3 border-t border-gray-800 text-gray-500 text-sm">
-                    <button className="flex items-center gap-1 hover:text-red-400 transition" onClick={e => e.stopPropagation()}>
-                      <Heart size={14} /> Like
-                    </button>
-                    <button className="flex items-center gap-1 hover:text-blue-400 transition" onClick={e => e.stopPropagation()}>
-                      <MessageCircle size={14} /> Comment
-                    </button>
-                    <button className="flex items-center gap-1 hover:text-green-400 transition" onClick={e => e.stopPropagation()}>
-                      <HandMetal size={14} /> Raise Hand
-                    </button>
-                  </div>
+          {/* Right sidebar */}
+          <div className="w-72 px-6 py-8 hidden lg:block">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
+              <h3 className="font-semibold text-white mb-4">Trending Skills</h3>
+              {['React', 'Next.js', 'TypeScript', 'Python', 'Tailwind CSS'].map((skill, i) => (
+                <div key={skill} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
+                  <span className="text-sm text-gray-300">{skill}</span>
+                  <span className="text-xs text-gray-500">{(5 - i) * 120 + 200} projects</span>
                 </div>
               ))}
             </div>
-          )}
-        </div>
 
-        {/* Right sidebar */}
-        <div className="w-72 px-6 py-8 hidden lg:block">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
-            <h3 className="font-semibold text-white mb-4">Trending Skills</h3>
-            {['React', 'Next.js', 'TypeScript', 'Python', 'Tailwind CSS'].map((skill, i) => (
-              <div key={skill} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
-                <span className="text-sm text-gray-300">{skill}</span>
-                <span className="text-xs text-gray-500">{(5 - i) * 120 + 200} projects</span>
-              </div>
-            ))}
-          </div>
+            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5">
+              <h3 className="font-semibold text-white mb-2">Build in public.</h3>
+              <p className="text-gray-400 text-sm mb-4">Share your progress, get feedback, and find your next collaborator.</p>
+              <button onClick={() => setShowCreateModal(true)} className="w-full bg-green-500 hover:bg-green-400 text-black font-semibold py-2 rounded-lg text-sm transition">
+                Start a Project
+              </button>
+            </div>
 
-          <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5">
-            <h3 className="font-semibold text-white mb-2">Build in public.</h3>
-            <p className="text-gray-400 text-sm mb-4">Share your progress, get feedback, and find your next collaborator.</p>
-            <button onClick={() => setShowCreateModal(true)} className="w-full bg-green-500 hover:bg-green-400 text-black font-semibold py-2 rounded-lg text-sm transition">
-              Start a Project
-            </button>
+            <WhoToFollow currentUserId={user?.id} followingIds={followingIds} onFollow={fetchProjects} navigate={navigate} />
           </div>
         </div>
       </div>
@@ -239,6 +330,49 @@ export default function Dashboard() {
     </div>
   )
 }
+
+
+function NotificationBell({ userId, onClick }) {
+  const [count, setCount] = useState(0)
+
+  useEffect(() => {
+    if (!userId) return
+    const fetchCount = async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('read', false)
+      setCount(data?.length || 0)
+    }
+    fetchCount()
+
+    const channel = supabase
+      .channel('notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`
+      }, () => fetchCount())
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [userId])
+
+  return (
+    <button onClick={onClick} className="relative p-2 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white transition">
+      <Bell size={18} />
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full text-black text-xs font-bold flex items-center justify-center">
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
+  )
+}
+
+
 
 function CreateProjectModal({ onClose, onCreated, userId }) {
   const [title, setTitle] = useState('')
@@ -324,6 +458,82 @@ function CreateProjectModal({ onClose, onCreated, userId }) {
           </button>
         </form>
       </div>
+    </div>
+  )
+}
+
+function WhoToFollow({ currentUserId, followingIds, onFollow, navigate }) {
+  const [suggestions, setSuggestions] = useState([])
+  const [localFollowing, setLocalFollowing] = useState([])
+
+  useEffect(() => {
+    setLocalFollowing(followingIds)
+  }, [followingIds])
+
+  useEffect(() => {
+    if (!currentUserId) return
+    const fetchSuggestions = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', currentUserId)
+        .limit(5)
+      setSuggestions(data || [])
+    }
+    fetchSuggestions()
+  }, [currentUserId])
+
+  const handleFollow = async (profileId) => {
+    if (localFollowing.includes(profileId)) {
+      await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profileId)
+      setLocalFollowing(prev => prev.filter(id => id !== profileId))
+    } else {
+      await supabase.from('follows').insert({ follower_id: currentUserId, following_id: profileId })
+      await supabase.from('notifications').insert({
+        user_id: profileId,
+        from_user_id: currentUserId,
+        type: 'follow',
+        project_id: null
+      })
+      setLocalFollowing(prev => [...prev, profileId])
+    }
+    onFollow()
+  }
+
+  const initials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'
+
+  if (suggestions.length === 0) return null
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mt-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-semibold text-white">Who to Follow</h3>
+        <button onClick={() => navigate('/builders')} className="text-green-400 text-sm hover:underline">
+          View all
+        </button>
+      </div>
+      {suggestions.map(profile => (
+        <div key={profile.id} className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`/profile/${profile.id}`)}>
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.full_name} className="w-9 h-9 rounded-full object-cover" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">
+                {initials(profile.full_name)}
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-white font-medium">{profile.full_name}</p>
+              <p className="text-xs text-gray-400">@{profile.username}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleFollow(profile.id)}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition ${localFollowing.includes(profile.id) ? 'bg-gray-700 text-gray-400' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}>
+            {localFollowing.includes(profile.id) ? 'Following' : 'Follow'}
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

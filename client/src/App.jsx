@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
 import CelebrationWall from './pages/CelebrationWall'
 import Profile from './pages/Profile'
+import Notifications from './pages/Notifications'
+import Builders from './pages/Builders'
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -35,6 +37,8 @@ export default function App() {
       <Route path="/celebration" element={<PrivateRoute><CelebrationWall /></PrivateRoute>} />
       <Route path="/profile/:id" element={<PrivateRoute><Profile /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
+      <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+      <Route path="/builders" element={<PrivateRoute><Builders /></PrivateRoute>} />
     </Routes>
   )
 }

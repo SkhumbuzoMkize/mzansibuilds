@@ -49,8 +49,10 @@ export default function Register() {
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            <span className="text-green-500">&lt;/&gt;</span> MzansiBuilds
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">
+            <span className="text-green-500">&lt;/&gt;</span>{' '}
+            <span className="text-white">Mzansi</span>
+            <span className="text-green-500">Builds</span>
           </h1>
           <p className="text-gray-400">Create your account and start building</p>
         </div>

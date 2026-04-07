@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ArrowLeft, Plus, Heart, HandMetal, Send } from 'lucide-react'
+import { Plus, Send, Home, Bookmark, UserPlus, UserCheck, Heart, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ProjectDetail() {
@@ -17,36 +17,61 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true)
   const [liked, setLiked] = useState(false)
   const [raised, setRaised] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [following, setFollowing] = useState(false)
+  const [likesCount, setLikesCount] = useState(0)
+  const [collabsCount, setCollabsCount] = useState(0)
 
   useEffect(() => {
     fetchAll()
   }, [id])
 
   const fetchAll = async () => {
-    const [{ data: proj }, { data: comms }, { data: miles }, { data: likeData }, { data: collabData }] = await Promise.all([
+    const [{ data: proj }, { data: comms }, { data: miles }, { data: likeData }, { data: collabData }, { data: savedData }, { data: followData }, { data: allLikes }, { data: allCollabs }] = await Promise.all([
       supabase.from('projects').select('*, profiles(full_name, username)').eq('id', id).single(),
       supabase.from('comments').select('*, profiles(full_name, username)').eq('project_id', id).order('created_at'),
       supabase.from('milestones').select('*').eq('project_id', id).order('created_at'),
       supabase.from('likes').select('id').eq('project_id', id).eq('user_id', user?.id),
       supabase.from('collaborations').select('id').eq('project_id', id).eq('user_id', user?.id),
+      supabase.from('saved_projects').select('id').eq('project_id', id).eq('user_id', user?.id),
+      supabase.from('follows').select('id, following_id').eq('follower_id', user?.id),
+      supabase.from('likes').select('id').eq('project_id', id),
+      supabase.from('collaborations').select('id').eq('project_id', id),
     ])
     setProject(proj)
     setComments(comms || [])
     setMilestones(miles || [])
     setLiked(likeData?.length > 0)
     setRaised(collabData?.length > 0)
+    setSaved(savedData?.length > 0)
+    setLikesCount(allLikes?.length || 0)
+    setCollabsCount(allCollabs?.length || 0)
+    if (proj) {
+      const isFollowing = followData?.some(f => f.following_id === proj.user_id)
+      setFollowing(isFollowing || false)
+    }
     setLoading(false)
   }
 
   const handleComment = async (e) => {
-    e.preventDefault()
-    if (!newComment.trim()) return
-    const { error } = await supabase.from('comments').insert({
-      project_id: id, user_id: user.id, content: newComment
-    })
-    if (!error) { setNewComment(''); fetchAll() }
-    else toast.error(error.message)
-  }
+  e.preventDefault()
+  if (!newComment.trim()) return
+  const { error } = await supabase.from('comments').insert({
+    project_id: id, user_id: user.id, content: newComment
+  })
+  if (!error) {
+    setNewComment('')
+    if (project.user_id !== user.id) {
+      await supabase.from('notifications').insert({
+        user_id: project.user_id,
+        from_user_id: user.id,
+        type: 'comment',
+        project_id: id
+      })
+    }
+    fetchAll()
+  } else toast.error(error.message)
+}
 
   const handleAddMilestone = async (e) => {
     e.preventDefault()
@@ -65,20 +90,78 @@ export default function ProjectDetail() {
   }
 
   const handleLike = async () => {
-    if (liked) {
-      await supabase.from('likes').delete().eq('project_id', id).eq('user_id', user.id)
-    } else {
-      await supabase.from('likes').insert({ project_id: id, user_id: user.id })
+  if (liked) {
+    await supabase.from('likes').delete().eq('project_id', id).eq('user_id', user.id)
+    setLiked(false)
+    setLikesCount(prev => prev - 1)
+  } else {
+    await supabase.from('likes').insert({ project_id: id, user_id: user.id })
+    setLiked(true)
+    setLikesCount(prev => prev + 1)
+    if (project.user_id !== user.id) {
+      await supabase.from('notifications').insert({
+        user_id: project.user_id,
+        from_user_id: user.id,
+        type: 'like',
+        project_id: id
+      })
     }
-    setLiked(!liked)
   }
+}
 
   const handleRaiseHand = async () => {
-    if (raised) return
-    const { error } = await supabase.from('collaborations').insert({ project_id: id, user_id: user.id })
-    if (!error) { setRaised(true); toast.success('Collaboration request sent!') }
-    else toast.error(error.message)
+    if (raised) {
+      await supabase.from('collaborations').delete().eq('project_id', id).eq('user_id', user.id)
+      setRaised(false)
+      setCollabsCount(prev => prev - 1)
+      toast.success('Hand lowered!')
+    } else {
+      const { error } = await supabase.from('collaborations').insert({ project_id: id, user_id: user.id })
+     if (!error) {
+     setRaised(true)
+     setCollabsCount(prev => prev + 1)
+     toast.success('Collaboration request sent! ✋')
+     if (project.user_id !== user.id) {
+     await supabase.from('notifications').insert({
+      user_id: project.user_id,
+      from_user_id: user.id,
+      type: 'collab',
+      project_id: id
+      })
+    }
   }
+  }
+  }
+
+  const handleSave = async () => {
+    if (saved) {
+      await supabase.from('saved_projects').delete().eq('project_id', id).eq('user_id', user.id)
+      setSaved(false)
+      toast.success('Removed from saved')
+    } else {
+      await supabase.from('saved_projects').insert({ project_id: id, user_id: user.id })
+      setSaved(true)
+      toast.success('Project saved! 🔖')
+    }
+  }
+
+  const handleFollow = async () => {
+  if (following) {
+    await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', project.user_id)
+    setFollowing(false)
+    toast.success('Unfollowed')
+  } else {
+    await supabase.from('follows').insert({ follower_id: user.id, following_id: project.user_id })
+    setFollowing(true)
+    toast.success('Following! 🎉')
+    await supabase.from('notifications').insert({
+      user_id: project.user_id,
+      from_user_id: user.id,
+      type: 'follow',
+      project_id: null
+    })
+  }
+}
 
   const handleComplete = async () => {
     await supabase.from('projects').update({ stage: 'Completed', progress: 100 }).eq('id', id)
@@ -135,11 +218,11 @@ export default function ProjectDetail() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="w-full px-8 py-8">
 
         {/* Back */}
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
-          <ArrowLeft size={16} /> Back to Feed
+          <Home size={16} /> Home
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,10 +241,23 @@ export default function ProjectDetail() {
                     <p className="font-medium">{project.profiles?.full_name}</p>
                     <p className="text-xs text-gray-500">@{project.profiles?.username}</p>
                   </div>
+                  {!isOwner && (
+                    <button onClick={handleFollow}
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs border transition ${following ? 'text-green-400 border-green-500/30 bg-green-500/10' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                      {following ? <UserCheck size={12} /> : <UserPlus size={12} />}
+                      {following ? 'Following' : 'Follow'}
+                    </button>
+                  )}
                 </div>
-                <span className={`text-xs px-3 py-1 rounded-full border ${stageColor(project.stage)}`}>
-                  {project.stage}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSave}
+                    className={`p-2 rounded-lg border transition ${saved ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                    <Bookmark size={14} fill={saved ? 'currentColor' : 'none'} />
+                  </button>
+                  <span className={`text-xs px-3 py-1 rounded-full border ${stageColor(project.stage)}`}>
+                    {project.stage}
+                  </span>
+                </div>
               </div>
 
               <h1 className="text-2xl font-bold mb-2">{project.title}</h1>
@@ -191,13 +287,15 @@ export default function ProjectDetail() {
                 )}
               </div>
 
+              
+
               {/* Actions */}
-              <div className="flex items-center gap-3 pt-4 border-t border-gray-800">
+              <div className="flex items-center gap-3">
                 <button onClick={handleLike} className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition ${liked ? 'text-red-400 border-red-500/30 bg-red-500/10' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                  <Heart size={14} /> Like
+                  {liked ? '❤️' : '🤍'} {liked ? 'Liked' : 'Like'}
                 </button>
-                <button onClick={handleRaiseHand} disabled={raised} className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition ${raised ? 'text-green-400 border-green-500/30 bg-green-500/10' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                  <HandMetal size={14} /> {raised ? 'Hand Raised!' : 'Raise Hand'}
+                <button onClick={handleRaiseHand} className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition ${raised ? 'text-green-400 border-green-500/30 bg-green-500/10' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                  ✋ {raised ? 'Lower Hand' : 'Raise Hand'}
                 </button>
                 {isOwner && project.stage !== 'Completed' && (
                   <button onClick={handleComplete} className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg border text-sm text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition">
