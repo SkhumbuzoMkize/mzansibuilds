@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { MessageCircle, Plus, Zap, Trophy, LogOut, User, Search, Bookmark, Bell } from 'lucide-react'
+import { MessageCircle, Plus, Zap, Trophy, LogOut, User, Search, Bookmark, Bell, Settings as SettingsIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [savedIds, setSavedIds] = useState([])
   const [counts, setCounts] = useState({})
   const navigate = useNavigate()
+  const [trendingSkills, setTrendingSkills] = useState([])
 
   useEffect(() => {
     fetchProjects()
@@ -23,19 +24,32 @@ export default function Dashboard() {
   }, [])
 
   const fetchProjects = async () => {
-    const [{ data: projectsData }, { data: followData }, { data: savedData }] = await Promise.all([
-      supabase.from('projects').select(`*, profiles(full_name, username, avatar_url)`).order('created_at', { ascending: false }),
-      supabase.from('follows').select('following_id').eq('follower_id', user?.id),
-      supabase.from('saved_projects').select('project_id').eq('user_id', user?.id),
-    ])
-    if (projectsData) {
-      setProjects(projectsData)
-      fetchCounts(projectsData)
-    }
-    if (followData) setFollowingIds(followData.map(f => f.following_id))
-    if (savedData) setSavedIds(savedData.map(s => s.project_id))
-    setLoading(false)
+  const [{ data: projectsData }, { data: followData }, { data: savedData }] = await Promise.all([
+    supabase.from('projects').select(`*, profiles(full_name, username, avatar_url)`).order('created_at', { ascending: false }),
+    supabase.from('follows').select('following_id').eq('follower_id', user?.id),
+    supabase.from('saved_projects').select('project_id').eq('user_id', user?.id),
+  ])
+  if (projectsData) {
+    setProjects(projectsData)
+    fetchCounts(projectsData)
+
+    // Calculate trending skills from real data
+    const skillMap = {}
+    projectsData.forEach(p => {
+      p.tech_stack?.forEach(skill => {
+        skillMap[skill] = (skillMap[skill] || 0) + 1
+      })
+    })
+    const sorted = Object.entries(skillMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([skill, count]) => ({ skill, count }))
+    setTrendingSkills(sorted)
   }
+  if (followData) setFollowingIds(followData.map(f => f.following_id))
+  if (savedData) setSavedIds(savedData.map(s => s.project_id))
+  setLoading(false)
+}
 
   const fetchCounts = async (projectsList) => {
     const ids = projectsList.map(p => p.id)
@@ -149,6 +163,9 @@ export default function Dashboard() {
           <button onClick={() => navigate(`/profile/${user?.id}`)} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 text-sm transition">
             <User size={16} /> My Profile
           </button>
+          <button onClick={() => navigate('/settings')} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 text-sm transition">
+          <SettingsIcon size={16} /> Settings
+          </button>
         </nav>
 
         <div className="p-4 border-t border-gray-800">
@@ -190,7 +207,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <Zap size={20} className="text-green-500" /> Developer Feed
+                <Zap size={20} className="text-green-500" /> Developer <span className="text-green-500">Feed</span>
                 </h2>
                 <p className="text-gray-500 text-sm mt-1">See what developers are building</p>
               </div>
@@ -304,13 +321,18 @@ export default function Dashboard() {
           <div className="w-72 px-6 py-8 hidden lg:block">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
               <h3 className="font-semibold text-white mb-4">Trending Skills</h3>
-              {['React', 'Next.js', 'TypeScript', 'Python', 'Tailwind CSS'].map((skill, i) => (
-                <div key={skill} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
-                  <span className="text-sm text-gray-300">{skill}</span>
-                  <span className="text-xs text-gray-500">{(5 - i) * 120 + 200} projects</span>
-                </div>
-              ))}
+                {trendingSkills.length === 0 ? (
+                <p className="text-xs text-gray-500">No skills data yet</p>
+                ) : trendingSkills.map(({ skill, count }, i) => (
+               <div key={skill} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
+              <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 font-mono">{i + 1}</span>
+             <span className="text-sm text-gray-300">{skill}</span>
             </div>
+          <span className="text-xs text-green-400 font-medium">{count} {count === 1 ? 'project' : 'projects'}</span>
+          </div>
+          ))}
+          </div>
 
             <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5">
               <h3 className="font-semibold text-white mb-2">Build in public.</h3>

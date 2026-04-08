@@ -10,7 +10,9 @@ export default function Landing() {
       {/* Nav */}
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">
-          <span className="text-green-500">&lt;/&gt;</span> MzansiBuilds
+          <span className="text-green-500">&lt;/&gt;</span>{' '}
+          <span className="text-white">Mzansi</span>
+          <span className="text-green-500">Builds</span>
         </h1>
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/login')} className="text-gray-400 hover:text-white text-sm transition">

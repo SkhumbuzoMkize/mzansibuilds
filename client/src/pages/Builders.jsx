@@ -51,7 +51,7 @@ export default function Builders() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="w-full px-10 py-8">
 
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
           <Home size={16} /> Home
