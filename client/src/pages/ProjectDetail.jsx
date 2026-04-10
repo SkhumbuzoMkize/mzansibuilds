@@ -5,6 +5,104 @@ import { useAuth } from '../context/AuthContext'
 import { Plus, Send, Home, Bookmark, UserPlus, UserCheck, Heart, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+
+function EditProjectModal({ project, onClose, onUpdated }) {
+  const [title, setTitle] = useState(project.title)
+  const [description, setDescription] = useState(project.description || '')
+  const [stage, setStage] = useState(project.stage)
+  const [techStack, setTechStack] = useState(project.tech_stack?.join(', ') || '')
+  const [needHelp, setNeedHelp] = useState(project.need_help || false)
+  const [helpDescription, setHelpDescription] = useState(project.help_description || '')
+  const [progress, setProgress] = useState(project.progress || 0)
+  const [loading, setLoading] = useState(false)
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    const techArray = techStack.split(',').map(t => t.trim()).filter(Boolean)
+    const { error } = await supabase.from('projects').update({
+      title,
+      description,
+      stage,
+      tech_stack: techArray,
+      need_help: needHelp,
+      help_description: helpDescription,
+      progress,
+      updated_at: new Date().toISOString()
+    }).eq('id', project.id)
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Project updated!')
+      onUpdated()
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-5">
+          <h3 className="text-lg font-semibold">Edit Project</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-white">✕</button>
+        </div>
+        <form onSubmit={handleUpdate} className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-400 mb-1 block">Project Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} required
+              className="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 mb-1 block">Description</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+              className="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500 resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-gray-400 mb-1 block">Stage</label>
+              <select value={stage} onChange={e => setStage(e.target.value)}
+                className="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
+                <option>Planning</option>
+                <option>Building</option>
+                <option>Testing</option>
+                <option>Completed</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 mb-1 block">Tech Stack</label>
+              <input value={techStack} onChange={e => setTechStack(e.target.value)} placeholder="React, Node.js, ..."
+                className="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500" />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 mb-1 block">Progress: {progress}%</label>
+            <input type="range" min="0" max="100" value={progress}
+              onChange={e => setProgress(parseInt(e.target.value))}
+              className="w-full accent-green-500" />
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setNeedHelp(!needHelp)}
+              className={`w-10 h-6 rounded-full transition-colors ${needHelp ? 'bg-green-500' : 'bg-gray-700'}`}>
+              <div className={`w-4 h-4 bg-white rounded-full mx-auto transition-transform ${needHelp ? 'translate-x-2' : '-translate-x-2'}`} />
+            </button>
+            <label className="text-sm text-gray-400">Looking for collaborators</label>
+          </div>
+          {needHelp && (
+            <input value={helpDescription} onChange={e => setHelpDescription(e.target.value)}
+              placeholder="e.g. Frontend Developer, Designer"
+              className="w-full bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500" />
+          )}
+          <button type="submit" disabled={loading}
+            className="w-full bg-green-500 hover:bg-green-400 text-black font-semibold py-3 rounded-lg transition disabled:opacity-50">
+            {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+
 export default function ProjectDetail() {
   const { id } = useParams()
   const { user } = useAuth()
@@ -19,6 +117,7 @@ export default function ProjectDetail() {
   const [raised, setRaised] = useState(false)
   const [saved, setSaved] = useState(false)
   const [following, setFollowing] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
   const [collabsCount, setCollabsCount] = useState(0)
 
@@ -369,24 +468,50 @@ export default function ProjectDetail() {
 
             {/* About */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-              <h3 className="font-semibold mb-3">About this project</h3>
-              <div className="space-y-2 text-sm">
+             <h3 className="font-semibold mb-3">About this project</h3>
+               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Stage</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${stageColor(project.stage)}`}>{project.stage}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Started</span>
-                  <span className="text-gray-300">{new Date(project.created_at).toLocaleDateString()}</span>
-                </div>
-                {project.need_help && (
-                  <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                    <p className="text-green-400 text-xs font-medium mb-1">Needs Collaborators</p>
-                    <p className="text-gray-400 text-xs">{project.help_description}</p>
-                  </div>
-                )}
+                <span className="text-gray-500">Stage</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${stageColor(project.stage)}`}>{project.stage}</span>
               </div>
+            <div className="flex justify-between">
+               <span className="text-gray-500">Started</span>
+               <span className="text-gray-300">{new Date(project.created_at).toLocaleDateString()}</span>
             </div>
+            {project.need_help && (
+            <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <p className="text-green-400 text-xs font-medium mb-1">Needs Collaborators</p>
+              <p className="text-gray-400 text-xs">{project.help_description}</p>
+            </div>
+            )}
+            {isOwner && (
+            <div className="mt-4 pt-4 border-t border-gray-800 space-y-2">
+            <button onClick={() => setShowEditModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-700 text-gray-400 hover:border-green-500 hover:text-green-400 text-sm transition">
+            ✏️ Edit Project
+            </button>
+            <button onClick={async () => {
+          if (!window.confirm('Delete this project? This cannot be undone.')) return
+          await supabase.from('projects').delete().eq('id', id)
+          toast.success('Project deleted')
+          navigate('/dashboard')
+          }}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm transition">
+          🗑️ Delete Project
+          </button>
+          </div>
+          )}
+
+          {showEditModal && (
+          <EditProjectModal
+          project={project}
+          onClose={() => setShowEditModal(false)}
+          onUpdated={() => { setShowEditModal(false); fetchAll() }}
+          />
+          )} 
+
+          </div>
+          </div>
           </div>
         </div>
       </div>
