@@ -102,6 +102,36 @@ npm test -- --run
 
 ## Features
 
+### Core Features
+
+- Developer accounts and profiles with avatar upload
+- Create and manage projects with stage tracking and progress
+- Live developer feed with search and filters
+- Comments, likes and collaboration requests (raise hand)
+- Milestone tracking per project
+- Celebration Wall for completed projects
+
+### Social Features
+
+- Follow/unfollow other developers
+- Save/bookmark projects
+- Real-time notifications (likes, comments, follows, collaborations)
+- Who to Follow suggestions
+- All Builders directory with search
+
+### Project Showcase
+
+- Project README with rich text
+- Screenshot uploads
+- Edit and delete own projects
+- View Project detail with tabs (Overview, README, Screenshots)
+
+### Settings
+
+- Account management
+- Password change
+- Notification preferences
+
 ### Developer Feed
 
 Real-time feed showing all projects being built. Filter by All, Following, or Seeking Collab.

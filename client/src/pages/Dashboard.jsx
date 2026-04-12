@@ -244,9 +244,13 @@ export default function Dashboard() {
                     onClick={() => navigate(`/project/${project.id}`)}>
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
+                        {project.profiles?.avatar_url ? (
+                        <img src={project.profiles.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                        ) : (
                         <div className="w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">
-                          {initials(project.profiles?.full_name || 'U')}
+                         {initials(project.profiles?.full_name || 'U')}
                         </div>
+                        )}
                         <div>
                           <p className="text-sm font-medium">{project.profiles?.full_name}</p>
                           <p className="text-xs text-gray-500">@{project.profiles?.username} · {timeAgo(project.created_at)}</p>

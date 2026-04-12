@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import { Plus, Send, Home, Bookmark, UserPlus, UserCheck, Heart, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-
 function EditProjectModal({ project, onClose, onUpdated }) {
   const [title, setTitle] = useState(project.title)
   const [description, setDescription] = useState(project.description || '')
@@ -21,21 +20,11 @@ function EditProjectModal({ project, onClose, onUpdated }) {
     setLoading(true)
     const techArray = techStack.split(',').map(t => t.trim()).filter(Boolean)
     const { error } = await supabase.from('projects').update({
-      title,
-      description,
-      stage,
-      tech_stack: techArray,
-      need_help: needHelp,
-      help_description: helpDescription,
-      progress,
-      updated_at: new Date().toISOString()
+      title, description, stage, tech_stack: techArray,
+      need_help: needHelp, help_description: helpDescription,
+      progress, updated_at: new Date().toISOString()
     }).eq('id', project.id)
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success('Project updated!')
-      onUpdated()
-    }
+    if (error) { toast.error(error.message) } else { toast.success('Project updated!'); onUpdated() }
     setLoading(false)
   }
 
@@ -102,7 +91,6 @@ function EditProjectModal({ project, onClose, onUpdated }) {
   )
 }
 
-
 export default function ProjectDetail() {
   const { id } = useParams()
   const { user } = useAuth()
@@ -120,14 +108,24 @@ export default function ProjectDetail() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
   const [collabsCount, setCollabsCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [readme, setReadme] = useState('')
+  const [screenshots, setScreenshots] = useState([])
+  const [uploadingScreenshot, setUploadingScreenshot] = useState(false)
+  const [editingReadme, setEditingReadme] = useState(false)
+  const [readmeContent, setReadmeContent] = useState('')
 
   useEffect(() => {
     fetchAll()
   }, [id])
 
   const fetchAll = async () => {
-    const [{ data: proj }, { data: comms }, { data: miles }, { data: likeData }, { data: collabData }, { data: savedData }, { data: followData }, { data: allLikes }, { data: allCollabs }] = await Promise.all([
-      supabase.from('projects').select('*, profiles(full_name, username)').eq('id', id).single(),
+    const [
+      { data: proj }, { data: comms }, { data: miles },
+      { data: likeData }, { data: collabData }, { data: savedData },
+      { data: followData }, { data: allLikes }, { data: allCollabs }
+    ] = await Promise.all([
+      supabase.from('projects').select('*, profiles(full_name, username, avatar_url)').eq('id', id).single(),
       supabase.from('comments').select('*, profiles(full_name, username)').eq('project_id', id).order('created_at'),
       supabase.from('milestones').select('*').eq('project_id', id).order('created_at'),
       supabase.from('likes').select('id').eq('project_id', id).eq('user_id', user?.id),
@@ -145,6 +143,9 @@ export default function ProjectDetail() {
     setSaved(savedData?.length > 0)
     setLikesCount(allLikes?.length || 0)
     setCollabsCount(allCollabs?.length || 0)
+    setReadme(proj?.readme || '')
+    setReadmeContent(proj?.readme || '')
+    setScreenshots(proj?.screenshots || [])
     if (proj) {
       const isFollowing = followData?.some(f => f.following_id === proj.user_id)
       setFollowing(isFollowing || false)
@@ -153,31 +154,26 @@ export default function ProjectDetail() {
   }
 
   const handleComment = async (e) => {
-  e.preventDefault()
-  if (!newComment.trim()) return
-  const { error } = await supabase.from('comments').insert({
-    project_id: id, user_id: user.id, content: newComment
-  })
-  if (!error) {
-    setNewComment('')
-    if (project.user_id !== user.id) {
-      await supabase.from('notifications').insert({
-        user_id: project.user_id,
-        from_user_id: user.id,
-        type: 'comment',
-        project_id: id
-      })
-    }
-    fetchAll()
-  } else toast.error(error.message)
-}
+    e.preventDefault()
+    if (!newComment.trim()) return
+    const { error } = await supabase.from('comments').insert({
+      project_id: id, user_id: user.id, content: newComment
+    })
+    if (!error) {
+      setNewComment('')
+      if (project.user_id !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: project.user_id, from_user_id: user.id, type: 'comment', project_id: id
+        })
+      }
+      fetchAll()
+    } else toast.error(error.message)
+  }
 
   const handleAddMilestone = async (e) => {
     e.preventDefault()
     if (!newMilestone.trim()) return
-    const { error } = await supabase.from('milestones').insert({
-      project_id: id, title: newMilestone
-    })
+    const { error } = await supabase.from('milestones').insert({ project_id: id, title: newMilestone })
     if (!error) { setNewMilestone(''); fetchAll() }
     else toast.error(error.message)
   }
@@ -189,24 +185,21 @@ export default function ProjectDetail() {
   }
 
   const handleLike = async () => {
-  if (liked) {
-    await supabase.from('likes').delete().eq('project_id', id).eq('user_id', user.id)
-    setLiked(false)
-    setLikesCount(prev => prev - 1)
-  } else {
-    await supabase.from('likes').insert({ project_id: id, user_id: user.id })
-    setLiked(true)
-    setLikesCount(prev => prev + 1)
-    if (project.user_id !== user.id) {
-      await supabase.from('notifications').insert({
-        user_id: project.user_id,
-        from_user_id: user.id,
-        type: 'like',
-        project_id: id
-      })
+    if (liked) {
+      await supabase.from('likes').delete().eq('project_id', id).eq('user_id', user.id)
+      setLiked(false)
+      setLikesCount(prev => prev - 1)
+    } else {
+      await supabase.from('likes').insert({ project_id: id, user_id: user.id })
+      setLiked(true)
+      setLikesCount(prev => prev + 1)
+      if (project.user_id !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: project.user_id, from_user_id: user.id, type: 'like', project_id: id
+        })
+      }
     }
   }
-}
 
   const handleRaiseHand = async () => {
     if (raised) {
@@ -216,20 +209,17 @@ export default function ProjectDetail() {
       toast.success('Hand lowered!')
     } else {
       const { error } = await supabase.from('collaborations').insert({ project_id: id, user_id: user.id })
-     if (!error) {
-     setRaised(true)
-     setCollabsCount(prev => prev + 1)
-     toast.success('Collaboration request sent! ✋')
-     if (project.user_id !== user.id) {
-     await supabase.from('notifications').insert({
-      user_id: project.user_id,
-      from_user_id: user.id,
-      type: 'collab',
-      project_id: id
-      })
+      if (!error) {
+        setRaised(true)
+        setCollabsCount(prev => prev + 1)
+        toast.success('Collaboration request sent! ✋')
+        if (project.user_id !== user.id) {
+          await supabase.from('notifications').insert({
+            user_id: project.user_id, from_user_id: user.id, type: 'collab', project_id: id
+          })
+        }
+      }
     }
-  }
-  }
   }
 
   const handleSave = async () => {
@@ -245,22 +235,19 @@ export default function ProjectDetail() {
   }
 
   const handleFollow = async () => {
-  if (following) {
-    await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', project.user_id)
-    setFollowing(false)
-    toast.success('Unfollowed')
-  } else {
-    await supabase.from('follows').insert({ follower_id: user.id, following_id: project.user_id })
-    setFollowing(true)
-    toast.success('Following! 🎉')
-    await supabase.from('notifications').insert({
-      user_id: project.user_id,
-      from_user_id: user.id,
-      type: 'follow',
-      project_id: null
-    })
+    if (following) {
+      await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', project.user_id)
+      setFollowing(false)
+      toast.success('Unfollowed')
+    } else {
+      await supabase.from('follows').insert({ follower_id: user.id, following_id: project.user_id })
+      setFollowing(true)
+      toast.success('Following! 🎉')
+      await supabase.from('notifications').insert({
+        user_id: project.user_id, from_user_id: user.id, type: 'follow', project_id: null
+      })
+    }
   }
-}
 
   const handleComplete = async () => {
     await supabase.from('projects').update({ stage: 'Completed', progress: 100 }).eq('id', id)
@@ -271,6 +258,43 @@ export default function ProjectDetail() {
   const updateProgress = async (progress) => {
     await supabase.from('projects').update({ progress }).eq('id', id)
     fetchAll()
+  }
+
+  const handleScreenshotUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingScreenshot(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${id}-${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars').upload(`screenshots/${fileName}`, file, { upsert: true })
+      if (uploadError) { toast.error(uploadError.message); return }
+      const { data } = supabase.storage.from('avatars').getPublicUrl(`screenshots/${fileName}`)
+      const newScreenshots = [...screenshots, data.publicUrl]
+      await supabase.from('projects').update({ screenshots: newScreenshots }).eq('id', id)
+      setScreenshots(newScreenshots)
+      toast.success('Screenshot uploaded!')
+    } catch (err) {
+      toast.error('Upload failed')
+    } finally {
+      setUploadingScreenshot(false)
+    }
+  }
+
+  const handleSaveReadme = async () => {
+    const { error } = await supabase.from('projects').update({ readme: readmeContent }).eq('id', id)
+    if (error) { toast.error(error.message); return }
+    setReadme(readmeContent)
+    setEditingReadme(false)
+    toast.success('README saved!')
+  }
+
+  const handleDeleteScreenshot = async (url) => {
+    const newScreenshots = screenshots.filter(s => s !== url)
+    await supabase.from('projects').update({ screenshots: newScreenshots }).eq('id', id)
+    setScreenshots(newScreenshots)
+    toast.success('Screenshot removed')
   }
 
   const stageColor = (stage) => {
@@ -319,7 +343,6 @@ export default function ProjectDetail() {
     <div className="min-h-screen bg-black text-white">
       <div className="w-full px-8 py-8">
 
-        {/* Back */}
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
           <Home size={16} /> Home
         </button>
@@ -333,9 +356,13 @@ export default function ProjectDetail() {
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
-                    {initials(project.profiles?.full_name)}
-                  </div>
+                  {project.profiles?.avatar_url ? (
+                    <img src={project.profiles.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">
+                      {initials(project.profiles?.full_name)}
+                    </div>
+                  )}
                   <div>
                     <p className="font-medium">{project.profiles?.full_name}</p>
                     <p className="text-xs text-gray-500">@{project.profiles?.username}</p>
@@ -386,10 +413,10 @@ export default function ProjectDetail() {
                 )}
               </div>
 
-              
+
 
               {/* Actions */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3" style={{ marginTop: '2rem' }}>
                 <button onClick={handleLike} className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition ${liked ? 'text-red-400 border-red-500/30 bg-red-500/10' : 'text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                   {liked ? '❤️' : '🤍'} {liked ? 'Liked' : 'Like'}
                 </button>
@@ -404,36 +431,138 @@ export default function ProjectDetail() {
               </div>
             </div>
 
-            {/* Comments */}
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold mb-4">Comments ({comments.length})</h3>
-              <div className="space-y-4 mb-4">
-                {comments.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No comments yet. Be the first!</p>
-                ) : comments.map(comment => (
-                  <div key={comment.id} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold flex-shrink-0">
-                      {initials(comment.profiles?.full_name)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">{comment.profiles?.full_name}</span>
-                        <span className="text-xs text-gray-500">{timeAgo(comment.created_at)}</span>
+            {/* Tabs */}
+            <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1">
+              {['overview', 'readme', 'screenshots'].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${activeTab === tab ? 'bg-green-500 text-black' : 'text-gray-400 hover:text-white'}`}>
+                  {tab === 'readme' ? '📄 README' : tab === 'screenshots' ? '🖼️ Screenshots' : '⚡ Overview'}
+                </button>
+              ))}
+            </div>
+
+            {/* Overview tab */}
+            {activeTab === 'overview' && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <h3 className="font-semibold mb-4">Comments ({comments.length})</h3>
+                <div className="space-y-4 mb-4">
+                  {comments.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No comments yet. Be the first!</p>
+                  ) : comments.map(comment => (
+                    <div key={comment.id} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold flex-shrink-0">
+                        {initials(comment.profiles?.full_name)}
                       </div>
-                      <p className="text-sm text-gray-300">{comment.content}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium">{comment.profiles?.full_name}</span>
+                          <span className="text-xs text-gray-500">{timeAgo(comment.created_at)}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">{comment.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleComment} className="flex gap-3">
+                  <input value={newComment} onChange={e => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500" />
+                  <button type="submit" className="bg-green-500 hover:bg-green-400 text-black px-4 py-2.5 rounded-lg transition">
+                    <Send size={14} />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* README tab */}
+            {activeTab === 'readme' && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Project README</h3>
+                  {isOwner && !editingReadme && (
+                    <button onClick={() => setEditingReadme(true)}
+                      className="text-xs border border-gray-700 hover:border-green-500 hover:text-green-400 text-gray-400 px-3 py-1.5 rounded-lg transition">
+                      ✏️ Edit README
+                    </button>
+                  )}
+                </div>
+                {editingReadme ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={readmeContent}
+                      onChange={e => setReadmeContent(e.target.value)}
+                      rows={15}
+                      placeholder={`## What it does\nDescribe your project...\n\n## Tech Stack\n- React\n- Node.js\n\n## How to run\n1. Clone the repo\n2. npm install\n3. npm run dev\n\n## Features\n- Feature 1\n- Feature 2`}
+                      className="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-green-500 resize-none font-mono"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={handleSaveReadme}
+                        className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-lg text-sm transition">
+                        Save README
+                      </button>
+                      <button onClick={() => { setEditingReadme(false); setReadmeContent(readme) }}
+                        className="border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm transition hover:border-gray-500">
+                        Cancel
+                      </button>
                     </div>
                   </div>
-                ))}
+                ) : readme ? (
+                  <pre className="whitespace-pre-wrap text-sm text-gray-300 font-sans leading-relaxed">{readme}</pre>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <p className="text-4xl mb-3">📄</p>
+                    <p className="text-sm mb-1">No README yet</p>
+                    {isOwner && (
+                      <button onClick={() => setEditingReadme(true)}
+                        className="mt-3 bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-lg text-sm transition">
+                        Add README
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              <form onSubmit={handleComment} className="flex gap-3">
-                <input value={newComment} onChange={e => setNewComment(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500" />
-                <button type="submit" className="bg-green-500 hover:bg-green-400 text-black px-4 py-2.5 rounded-lg transition">
-                  <Send size={14} />
-                </button>
-              </form>
-            </div>
+            )}
+
+            {/* Screenshots tab */}
+            {activeTab === 'screenshots' && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Screenshots</h3>
+                  {isOwner && (
+                    <label className={`text-xs border border-gray-700 hover:border-green-500 hover:text-green-400 text-gray-400 px-3 py-1.5 rounded-lg transition cursor-pointer ${uploadingScreenshot ? 'opacity-50' : ''}`}>
+                      {uploadingScreenshot ? 'Uploading...' : '📸 Add Screenshot'}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotUpload} disabled={uploadingScreenshot} />
+                    </label>
+                  )}
+                </div>
+                {screenshots.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <p className="text-4xl mb-3">🖼️</p>
+                    <p className="text-sm mb-1">No screenshots yet</p>
+                    {isOwner && (
+                      <label className="mt-3 inline-block bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+                        Upload Screenshot
+                        <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotUpload} />
+                      </label>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {screenshots.map((url, i) => (
+                      <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-800">
+                        <img src={url} alt={`Screenshot ${i + 1}`} className="w-full object-cover" />
+                        {isOwner && (
+                          <button onClick={() => handleDeleteScreenshot(url)}
+                            className="absolute top-2 right-2 w-7 h-7 bg-red-500/80 hover:bg-red-500 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right sidebar */}
@@ -468,53 +597,53 @@ export default function ProjectDetail() {
 
             {/* About */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-             <h3 className="font-semibold mb-3">About this project</h3>
-               <div className="space-y-2 text-sm">
+              <h3 className="font-semibold mb-3">About this project</h3>
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                <span className="text-gray-500">Stage</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full border ${stageColor(project.stage)}`}>{project.stage}</span>
+                  <span className="text-gray-500">Stage</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${stageColor(project.stage)}`}>{project.stage}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Started</span>
+                  <span className="text-gray-300">{new Date(project.created_at).toLocaleDateString()}</span>
+                </div>
+                {project.need_help && (
+                  <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <p className="text-green-400 text-xs font-medium mb-1">Needs Collaborators</p>
+                    <p className="text-gray-400 text-xs">{project.help_description}</p>
+                  </div>
+                )}
+                {isOwner && (
+                  <div className="mt-4 pt-4 border-t border-gray-800 space-y-2">
+                    <button onClick={() => setShowEditModal(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-700 text-gray-400 hover:border-green-500 hover:text-green-400 text-sm transition">
+                      ✏️ Edit Project
+                    </button>
+                    <button onClick={async () => {
+                      if (!window.confirm('Delete this project? This cannot be undone.')) return
+                      await supabase.from('projects').delete().eq('id', id)
+                      toast.success('Project deleted')
+                      navigate('/dashboard')
+                    }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm transition">
+                      🗑️ Delete Project
+                    </button>
+                  </div>
+                )}
               </div>
-            <div className="flex justify-between">
-               <span className="text-gray-500">Started</span>
-               <span className="text-gray-300">{new Date(project.created_at).toLocaleDateString()}</span>
             </div>
-            {project.need_help && (
-            <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <p className="text-green-400 text-xs font-medium mb-1">Needs Collaborators</p>
-              <p className="text-gray-400 text-xs">{project.help_description}</p>
-            </div>
-            )}
-            {isOwner && (
-            <div className="mt-4 pt-4 border-t border-gray-800 space-y-2">
-            <button onClick={() => setShowEditModal(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-700 text-gray-400 hover:border-green-500 hover:text-green-400 text-sm transition">
-            ✏️ Edit Project
-            </button>
-            <button onClick={async () => {
-          if (!window.confirm('Delete this project? This cannot be undone.')) return
-          await supabase.from('projects').delete().eq('id', id)
-          toast.success('Project deleted')
-          navigate('/dashboard')
-          }}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm transition">
-          🗑️ Delete Project
-          </button>
-          </div>
-          )}
-
-          {showEditModal && (
-          <EditProjectModal
-          project={project}
-          onClose={() => setShowEditModal(false)}
-          onUpdated={() => { setShowEditModal(false); fetchAll() }}
-          />
-          )} 
-
-          </div>
-          </div>
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setShowEditModal(false)}
+          onUpdated={() => { setShowEditModal(false); fetchAll() }}
+        />
+      )}
     </div>
   )
 }

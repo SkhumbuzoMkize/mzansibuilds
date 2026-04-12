@@ -61,6 +61,21 @@ A real-time developer feed platform where developers can:
 
 </div>
 
+### Tables Added Since Initial Design
+
+| Table          | Purpose                                                  |
+| -------------- | -------------------------------------------------------- |
+| follows        | Developer follow relationships                           |
+| saved_projects | Bookmarked projects per user                             |
+| notifications  | In-app notifications (likes, comments, follows, collabs) |
+
+### New Columns Added
+
+| Table    | Column      | Purpose                                |
+| -------- | ----------- | -------------------------------------- |
+| projects | readme      | Rich project description/documentation |
+| projects | screenshots | Array of project screenshot URLs       |
+
 ## Tech Stack Justification
 
 | Technology   | Reason                                               |
