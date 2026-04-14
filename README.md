@@ -152,6 +152,38 @@ When a project is marked as Completed, it automatically appears on the Celebrati
 
 Each developer has a profile with avatar, bio, and a grid of their projects.
 
+## App Screenshots
+
+### Landing Page
+
+| ---------------------------------------- |
+| ![Landing](docs/screenshots/landing.png) |
+
+### Developer Feed
+
+| -------------------------------------------- |
+| ![Dashboard](docs/screenshots/dashboard.png) |
+
+### Project Detail
+
+| ------------------------------------------------------ |
+| ![Project Detail](docs/screenshots/project-detail.png) |
+
+### Celebration Wall
+
+| ---------------------------------------------------------- |
+| ![Celebration Wall](docs/screenshots/celebration-wall.png) |
+
+### Profile Page
+
+| ---------------------------------------- |
+| ![Profile](docs/screenshots/profile.png) |
+
+### Notifications
+
+| ---------------------------------------------------- |
+| ![Notifications](docs/screenshots/notifications.png) |
+
 ## Documentation
 
 - [Project Profile & UML](./docs/PROJECT_PROFILE.md)
