@@ -156,33 +156,27 @@ Each developer has a profile with avatar, bio, and a grid of their projects.
 
 ### Landing Page
 
-| ---------------------------------------- |
-| ![Landing](docs/screenshots/landing.png) |
+![Landing](docs/screenshots/landing.png)
 
 ### Developer Feed
 
-| -------------------------------------------- |
-| ![Dashboard](docs/screenshots/dashboard.png) |
+![Dashboard](docs/screenshots/dashboard.png)
 
 ### Project Detail
 
-| ------------------------------------------------------ |
-| ![Project Detail](docs/screenshots/project-detail.png) |
+![Project Detail](docs/screenshots/project-detail.png)
 
 ### Celebration Wall
 
-| ---------------------------------------------------------- |
-| ![Celebration Wall](docs/screenshots/celebration-wall.png) |
+![Celebration Wall](docs/screenshots/celebration-wall.png)
 
 ### Profile Page
 
-| ---------------------------------------- |
-| ![Profile](docs/screenshots/profile.png) |
+![Profile](docs/screenshots/profile.png)
 
 ### Notifications
 
-| ---------------------------------------------------- |
-| ![Notifications](docs/screenshots/notifications.png) |
+![Notifications](docs/screenshots/notifications.png)
 
 ## Documentation
 
